@@ -62,18 +62,34 @@ jobs:
       #     install-alpine-dependencies: true
       - deploy:
           name: Push application Docker image
+          shell: "/bin/bash -eo pipefail"
           command: |
-            aws configure set AWS_ACCESS_KEY_ID ${ACCESS_KEY_ID}
-            aws configure set AWS_SECRET_ACCESS_KEY ${SECRET_ACCESS_KEY}
-            aws configure set AWS_DEFAULT_REGION ${AWS_DEFAULT_REGION}
+            GIT_COMMIT_ID=$(git rev-parse --short HEAD)
+            export AWS_PAGER=""
+             # use the OpenID Connect token to obtain AWS credentials
+            read -r AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN \<<< \
+              $(aws sts assume-role-with-web-identity \
+               --role-arn ${AWS_ROLE_ARN} \
+               --role-session-name "CircleCI-${CIRCLE_WORKFLOW_ID}-${CIRCLE_JOB}" \
+               --web-identity-token $CIRCLE_OIDC_TOKEN \
+               --duration-seconds 3600 \
+               --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+               --output text)
+            export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+            aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
+            aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
+            aws configure set aws_session_token ${AWS_SESSION_TOKEN}
+            aws configure set aws_role_arn ${AWS_ROLE_ARN}
+            aws configure set default.region us-east-1
             aws sts get-caller-identity
-            if [ "${CIRCLE_BRANCH}" == "master" ]; then
-              login="$(aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ECR_ACCOUNT_URL)"
-              docker tag app "${AWS_ECR_ACCOUNT_URL}/app:${CIRCLE_SHA1}" 
-              docker push "${AWS_ECR_ACCOUNT_URL}/app:${CIRCLE_SHA1}"
-            else
-              echo "This is not master branch. No ECR image uploaded"
-            fi
+            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR
+            docker tag app $ECR/go-test:$CIRCLE_BUILD_NUM
+            docker tag app $ECR/go-test:$CIRCLE_SHA1
+            docker tag app $ECR/go-test:git-$GIT_COMMIT_ID
+            docker push $ECR/go-test:$CIRCLE_BUILD_NUM
+            docker push $ECR/go-test:$CIRCLE_SHA1
+            docker push $ECR/go-test:git-$GIT_COMMIT_ID
+           
 
           
 workflows:
