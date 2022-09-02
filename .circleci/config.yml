@@ -16,6 +16,8 @@ jobs:
           command: |
             apk update
             apk add docker
+            apk add jq
+            apk add curl
             apk add --no-cache \
             python3 \
             py3-pip \
@@ -65,13 +67,9 @@ jobs:
           shell: "/bin/bash -eo pipefail"
           command: |
             GIT_COMMIT_ID=$(git rev-parse --short HEAD)
-            aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
-            aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
-            aws configure set aws_session_token ${AWS_SESSION_TOKEN}
-            aws configure set aws_role_arn ${AWS_ROLE_ARN}
-            aws configure set default.region us-east-1
-            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR
+            eval "$(aws sts assume-role-with-web-identity --role-arn $AWS_ROLE_ARN --role-session-name "${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}" --web-identity-token "${CIRCLE_OIDC_TOKEN}" --duration-seconds 3600 | jq -r '.Credentials | "export AWS_ACCESS_KEY_ID=\(.AccessKeyId)\nexport AWS_SECRET_ACCESS_KEY=\(.SecretAccessKey)\nexport AWS_SESSION_TOKEN=\(.SessionToken)\n"')"
             aws sts get-caller-identity
+            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR
             docker tag app $ECR/go-test:$CIRCLE_BUILD_NUM
             docker tag app $ECR/go-test:$CIRCLE_SHA1
             docker tag app $ECR/go-test:git-$GIT_COMMIT_ID
