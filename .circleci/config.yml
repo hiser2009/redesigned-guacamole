@@ -64,7 +64,6 @@ jobs:
       #     install-alpine-dependencies: true
       - deploy:
           name: Push application Docker image
-          shell: "/bin/bash -eo pipefail"
           command: |
             GIT_COMMIT_ID=$(git rev-parse --short HEAD)
             eval "$(aws sts assume-role-with-web-identity --role-arn $AWS_ROLE_ARN --role-session-name "${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}" --web-identity-token "${CIRCLE_OIDC_TOKEN}" --duration-seconds 3600 | jq -r '.Credentials | "export AWS_ACCESS_KEY_ID=\(.AccessKeyId)\nexport AWS_SECRET_ACCESS_KEY=\(.SecretAccessKey)\nexport AWS_SESSION_TOKEN=\(.SessionToken)\n"')"
