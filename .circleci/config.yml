@@ -4,6 +4,9 @@ jobs:
     working_directory: /app
     docker:
       - image: golang:1.18.5-alpine3.16
+    environment:
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ROLE_ARN: arn:aws:iam::144291977149:role/circleci-oidc
     steps:
       - checkout
       - setup_remote_docker:
@@ -52,22 +55,24 @@ jobs:
       #     command: |
       #       echo docker-compose -f ./docker-compose.test.yml >> ./docker-compose.test.yml
       #       docker-compose -f ./docker-compose.test.yml up
-      - run: echo I'm Done!
+      - run: "I'm Done!"
       # - snyk/scan:
       #     docker-image-name: app --severity-threshold=high     || true
       #     fail-on-issues: true
       #     install-alpine-dependencies: true
-      # - deploy:
-      #     name: Push application Docker image
-      #     command: |
-      #       aws configure set AWS_ACCESS_KEY_ID ${ACCESS_KEY_ID}
-      #       aws configure set AWS_SECRET_ACCESS_KEY ${SECRET_ACCESS_KEY}
-      #       aws configure set AWS_DEFAULT_REGION ${AWS_DEFAULT_REGION}
-      #       if [ "${CIRCLE_BRANCH}" == "main" ]; then
-      #         login="$(aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ECR_ACCOUNT_URL)"
-      #         docker tag app "${AWS_ECR_ACCOUNT_URL}/app:${CIRCLE_SHA1}" 
-      #         docker push "${AWS_ECR_ACCOUNT_URL}/app:${CIRCLE_SHA1}"
-      #       fi
+      - deploy:
+          name: Push application Docker image
+          command: |
+            aws configure set AWS_ACCESS_KEY_ID ${ACCESS_KEY_ID}
+            aws configure set AWS_SECRET_ACCESS_KEY ${SECRET_ACCESS_KEY}
+            aws configure set AWS_DEFAULT_REGION ${AWS_DEFAULT_REGION}
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+              login="$(aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ECR_ACCOUNT_URL)"
+              docker tag app "${AWS_ECR_ACCOUNT_URL}/app:${CIRCLE_SHA1}" 
+              docker push "${AWS_ECR_ACCOUNT_URL}/app:${CIRCLE_SHA1}"
+            else
+              echo "This is not master branch. No ECR image uploaded"
+            fi
 
           
 workflows:
