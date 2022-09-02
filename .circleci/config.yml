@@ -55,7 +55,7 @@ jobs:
       #     command: |
       #       echo docker-compose -f ./docker-compose.test.yml >> ./docker-compose.test.yml
       #       docker-compose -f ./docker-compose.test.yml up
-      - run: "I'm Done!"
+      - run: echo "Uploading Image Now"
       # - snyk/scan:
       #     docker-image-name: app --severity-threshold=high     || true
       #     fail-on-issues: true
@@ -66,6 +66,7 @@ jobs:
             aws configure set AWS_ACCESS_KEY_ID ${ACCESS_KEY_ID}
             aws configure set AWS_SECRET_ACCESS_KEY ${SECRET_ACCESS_KEY}
             aws configure set AWS_DEFAULT_REGION ${AWS_DEFAULT_REGION}
+            aws sts get-caller-identity
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
               login="$(aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ECR_ACCOUNT_URL)"
               docker tag app "${AWS_ECR_ACCOUNT_URL}/app:${CIRCLE_SHA1}" 
@@ -79,4 +80,6 @@ workflows:
   version: 2
   build_and_deploy:
     jobs:
-      - build
+      - build:
+          context:
+            - guac
